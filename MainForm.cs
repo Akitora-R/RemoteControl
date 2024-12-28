@@ -14,7 +14,7 @@ namespace RemoteControl
         private KeyboardPacketBuilder keyboardPacketBuilder = new();
         FullScreenForm? fullScreenForm;
         private DateTime lastUpdate = DateTime.MinValue;
-        private byte key = 0x00;
+
         public MainForm()
         {
             InitializeComponent();
@@ -139,28 +139,6 @@ namespace RemoteControl
             }
         }
 
-
-        //private void Video_NewFrame(object sender, NewFrameEventArgs eventArgs)
-        //{
-        //    lock (lockObject)
-        //    {
-        //        // 限制刷新频率 (例如每100ms更新一次)
-        //        if (DateTime.Now.Subtract(lastUpdate).TotalMilliseconds < 100)
-        //        {
-        //            return;
-        //        }
-        //        lastUpdate = DateTime.Now;
-
-        //        // 释放旧图像资源
-        //        if (pictureBox1.Image != null)
-        //        {
-        //            pictureBox1.Image.Dispose();
-        //        }
-
-        //        // 克隆新帧并显示在 PictureBox
-        //        pictureBox1.Image = (Bitmap)eventArgs.Frame.Clone();
-        //    }
-        //}
 
         private void VideoNewFrame(object sender, NewFrameEventArgs eventArgs)
         {
@@ -312,55 +290,6 @@ namespace RemoteControl
             }
             Console.WriteLine($"收到有效包：地址 {e.Address}, 命令 {e.Command}, 数据 {BitConverter.ToString(e.Data)}");
 
-        }
-
-        private byte[] BuildMousePackat(int deltaX, int deltaY)
-        {
-            byte[] data =
-            [
-                // 第一个字节固定为 0x01
-                0x01,
-                // 第二个字节：鼠标按键值
-                key, // 仅取最低 3 位，表示中键、右键、左键
-                // 第三个字节：X 方向移动距离
-                (byte)(deltaX >= 0 ? deltaX & 0x7F : (0x80 | (deltaX & 0x7F))),
-                // 第四个字节：Y 方向移动距离
-                (byte)(deltaY >= 0 ? deltaY & 0x7F : (0x80 | (deltaY & 0x7F))),
-                // 第五个字节：滚轮滚动值，默认为 0（无滚动）
-                0x00, // 可根据需求添加滚动逻辑
-            ];
-
-            // 构建最终命令包
-            return BuildCommandPacket(0x00, 0x05, data);
-        }
-        private byte[] BuildMouseWheelPackat(int i)
-        {
-            i /= 6;
-            byte b;
-            if (i >= 0)
-            {
-                b = (byte)(i & 0xFF);
-            }
-            else
-            {
-                b = (byte)(i & 0xFF | 0x80);
-            }
-            byte[] data =
-            [
-                // 第一个字节固定为 0x01
-                0x01,
-                // 第二个字节：鼠标按键值
-                key, // 仅取最低 3 位，表示中键、右键、左键
-                // 第三个字节：X 方向移动距离
-                0x00,
-                // 第四个字节：Y 方向移动距离
-                0x00,
-                // 第五个字节：滚轮滚动值，默认为 0（无滚动）
-                b, // 可根据需求添加滚动逻辑
-            ];
-
-            // 构建最终命令包
-            return PacketBuilder.BuildCommandPacket(0x00, 0x05, data);
         }
 
         private void pictureBox1_Click(object sender, EventArgs e)
