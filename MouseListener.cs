@@ -44,13 +44,13 @@ namespace RemoteControl
 
         public void Dispose()
         {
-            StopTracking();
+            Stop();
         }
 
         /// <summary>
         /// 启动鼠标跟踪
         /// </summary>
-        public void StartTracking()
+        public void Start()
         {
             if (isTracking)
             {
@@ -66,7 +66,7 @@ namespace RemoteControl
         /// <summary>
         /// 停止鼠标跟踪
         /// </summary>
-        public void StopTracking()
+        public void Stop()
         {
             if (!isTracking)
             {

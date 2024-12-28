@@ -4,38 +4,24 @@ using AForge.Video.DirectShow;
 
 namespace RemoteControl
 {
-    public partial class Form1 : Form
+    public partial class MainForm : Form
     {
         private VideoCaptureDevice? videoSource;
         private SerialPortHandler? serialPortHandler;
-        private MouseListener? mouseTracker;
-        private readonly KeyboardListener keyboardListener;
+        private MouseListener? mouseListener;
+        private MousePacketBuilder mousePacketBuilder = new();
+        private KeyboardListener? keyboardListener;
+        private KeyboardPacketBuilder keyboardPacketBuilder = new();
+        FullScreenForm? fullScreenForm;
         private DateTime lastUpdate = DateTime.MinValue;
         private byte key = 0x00;
-        FullScreenForm? fullScreenForm;
-        public Form1()
+        public MainForm()
         {
             InitializeComponent();
             this.Text = "USB摄像头捕获";
             // 初始化 ComboBox 并列举所有视频设备
             InitializeVideoDevices();
             InitializeSerialPorts();
-            keyboardListener = new(OnKeyPress);
-            keyboardListener.Start();
-        }
-
-        private void OnMouseMove(int x, int y, int deltaX, int deltaY)
-        {
-            if (mousePosLabel.InvokeRequired)
-            {
-                mousePosLabel.Invoke(() => mousePosLabel.Text = $"X = {x} Y = {y}\nΔX = {deltaX} ΔY = {deltaY}");
-            }
-            serialPortHandler?.SendCommand(BuildMousePackat(deltaX, deltaY));
-        }
-
-        private void OnKeyPress(Keys keys)
-        {
-            kbLabel.Text = keys.ToString();
         }
 
         private void InitializeSerialPorts()
@@ -56,38 +42,52 @@ namespace RemoteControl
             }
         }
 
+        private KeyboardListener InitKbListener(SerialPortHandler h)
+        {
+            return new((key, pressed) =>
+            {
+                if (pressed)
+                {
+                    h.SendCommand(keyboardPacketBuilder.OnKeyPress(key));
+                }
+                else
+                {
+                    h.SendCommand(keyboardPacketBuilder.OnKeyUp(key));
+                }
+            });
+        }
+
         private MouseListener InitMouseListener(SerialPortHandler h)
         {
             // L ↓513 ↑514
             // R ↓516 ↑517
             // M ↓519 ↑520
-            return new MouseListener(OnMouseMove,
-                i =>
-                {
-                    byte b;
-                    if (i >= 0)
-                    {
-                        b = (byte)(i & 0xFF);
-                    }
-                    else
-                    {
-                        b = (byte)(i & 0xFF | 0x80);
-                    }
-                    h.SendCommand(BuildMouseWheelPackat(b));
-                    Console.WriteLine($"wheel: {BitConverter.ToString([b])}");
-                },
-                i =>
-                {
-                    key = (byte)((1 << (i - 513) / 3) | key);
-                    h.SendCommand(BuildMousePackat(0, 0));
-                    Console.WriteLine($"btn down: {i} key status: {BitConverter.ToString([key])}");
-                },
-                i =>
-                {
-                    key = (byte)(~(1 << (i - 514) / 3) & key);
-                    h.SendCommand(BuildMousePackat(0, 0));
-                    Console.WriteLine($"btn up: {i} key status: {BitConverter.ToString([key])}");
-                });
+            return new MouseListener(
+                (int x, int y, int deltaX, int deltaY) =>
+            {
+                var p = mousePacketBuilder.BuildMousePackat(deltaX, deltaY);
+                h.SendCommand(p);
+            },
+            i =>
+            {
+                var p = mousePacketBuilder.BuildMouseWheelPackat(i);
+                h.SendCommand(p);
+                Console.WriteLine($"wheel: {BitConverter.ToString(p)}");
+            },
+            i =>
+            {
+                //key = (byte)((1 << (i - 513) / 3) | key);
+                //h.SendCommand(BuildMousePackat(0, 0));
+                //Console.WriteLine($"btn down: {i} key status: {BitConverter.ToString([key])}");
+                h.SendCommand(mousePacketBuilder.OnKeyPress(i));
+            },
+            i =>
+            {
+                //key = (byte)(~(1 << (i - 514) / 3) & key);
+                //h.SendCommand(BuildMousePackat(0, 0));
+                //Console.WriteLine($"btn up: {i} key status: {BitConverter.ToString([key])}");
+                h.SendCommand(mousePacketBuilder.OnKeyUp(i));
+            });
         }
 
         private byte[] BuildCommandPacket(byte address, byte command, byte[] data)
@@ -113,7 +113,7 @@ namespace RemoteControl
             Array.Copy(data, 0, packet, 5, data.Length);
             packet[^1] = sum;
 
-            Console.WriteLine($"发送包 {BitConverter.ToString(packet)}");
+            //Console.WriteLine($"发送包 {BitConverter.ToString(packet)}");
             return packet;
         }
 
@@ -224,8 +224,8 @@ namespace RemoteControl
                 videoSource.SignalToStop();
                 videoSource = null;
             }
-            mouseTracker?.Dispose();
-            keyboardListener.Dispose();
+            mouseListener?.Dispose();
+            keyboardListener?.Dispose();
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -287,6 +287,7 @@ namespace RemoteControl
                 return;
             }
             portDeviceBox.Enabled = false;
+            comBtn.Enabled = false;
             if (serialPortHandler == null || !serialPortHandler.IsOpen())
             {
                 var portName = SerialPort.GetPortNames()[portDeviceBox.SelectedIndex];
@@ -298,8 +299,8 @@ namespace RemoteControl
                 serialPortLabel.Text = $"串口已打开 {portName}";
             }
             serialPortHandler.SendCommand(BuildCommandPacket(0x00, 0x01, []));
-            mouseTracker = InitMouseListener(serialPortHandler);
-            mouseTracker.StartTracking();
+            mouseListener = InitMouseListener(serialPortHandler);
+            keyboardListener = InitKbListener(serialPortHandler);
         }
 
         void OnCh9329Response(object? sender, Ch9329ResponseEventArgs e)
@@ -332,28 +333,44 @@ namespace RemoteControl
             // 构建最终命令包
             return BuildCommandPacket(0x00, 0x05, data);
         }
-        private byte[] BuildMouseWheelPackat(byte w)
+        private byte[] BuildMouseWheelPackat(int i)
         {
+            i /= 6;
+            byte b;
+            if (i >= 0)
+            {
+                b = (byte)(i & 0xFF);
+            }
+            else
+            {
+                b = (byte)(i & 0xFF | 0x80);
+            }
             byte[] data =
             [
                 // 第一个字节固定为 0x01
                 0x01,
                 // 第二个字节：鼠标按键值
-                0x00, // 仅取最低 3 位，表示中键、右键、左键
+                key, // 仅取最低 3 位，表示中键、右键、左键
                 // 第三个字节：X 方向移动距离
                 0x00,
                 // 第四个字节：Y 方向移动距离
                 0x00,
                 // 第五个字节：滚轮滚动值，默认为 0（无滚动）
-                w, // 可根据需求添加滚动逻辑
+                b, // 可根据需求添加滚动逻辑
             ];
 
             // 构建最终命令包
-            return BuildCommandPacket(0x00, 0x05, data);
+            return PacketBuilder.BuildCommandPacket(0x00, 0x05, data);
         }
 
         private void pictureBox1_Click(object sender, EventArgs e)
         {
+            if (serialPortHandler == null || !serialPortHandler.IsOpen())
+            {
+                return;
+            }
+            keyboardListener!.Start();
+            mouseListener!.Start();
             fullScreenForm = new FullScreenForm();
             fullScreenForm.FormClosed += FullScreenForm_FormClosed;
             // 显示全屏表单
@@ -364,6 +381,8 @@ namespace RemoteControl
             // 当 FullScreenForm 关闭时触发
             fullScreenForm?.Dispose();
             fullScreenForm = null;
+            keyboardListener!.Stop();
+            mouseListener!.Stop();
         }
     }
 }

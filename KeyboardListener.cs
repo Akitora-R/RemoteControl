@@ -1,5 +1,7 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace RemoteControl
 {
@@ -13,9 +15,9 @@ namespace RemoteControl
 
         private static LowLevelKeyboardProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
-        private static Action<Keys> _callback;
+        private static Action<Keys, bool> _callback; // 修改为传递按键状态
 
-        public KeyboardListener(Action<Keys> callback)
+        public KeyboardListener(Action<Keys, bool> callback)
         {
             _callback = callback;
         }
@@ -43,10 +45,19 @@ namespace RemoteControl
 
         private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
+            if (nCode >= 0)
             {
                 int vkCode = Marshal.ReadInt32(lParam);
-                _callback((Keys)vkCode);
+                Keys key = (Keys)vkCode;
+
+                if (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)
+                {
+                    _callback(key, true); // 按键按下
+                }
+                else if (wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_SYSKEYUP)
+                {
+                    _callback(key, false); // 按键抬起
+                }
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }

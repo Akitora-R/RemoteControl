@@ -1,6 +1,6 @@
 ﻿namespace RemoteControl
 {
-    partial class Form1
+    partial class MainForm
     {
         /// <summary>
         ///  Required designer variable.
@@ -51,10 +51,10 @@
             groupBox1.TabStop = false;
             groupBox1.Text = "Screen";
             // 
-            // pictureBox1
+            // miniPicBox
             // 
             miniPicBox.Location = new Point(6, 22);
-            miniPicBox.Name = "pictureBox1";
+            miniPicBox.Name = "miniPicBox";
             miniPicBox.Size = new Size(640, 360);
             miniPicBox.SizeMode = PictureBoxSizeMode.StretchImage;
             miniPicBox.TabIndex = 0;
@@ -73,6 +73,7 @@
             // 
             // comboBox1
             // 
+            comboBox1.DropDownStyle = ComboBoxStyle.DropDownList;
             comboBox1.FormattingEnabled = true;
             comboBox1.Location = new Point(12, 12);
             comboBox1.Name = "comboBox1";
@@ -81,6 +82,7 @@
             // 
             // portDeviceBox
             // 
+            portDeviceBox.DropDownStyle = ComboBoxStyle.DropDownList;
             portDeviceBox.FormattingEnabled = true;
             portDeviceBox.Location = new Point(308, 12);
             portDeviceBox.Name = "portDeviceBox";
@@ -100,7 +102,7 @@
             // serialPortLabel
             // 
             serialPortLabel.AutoSize = true;
-            serialPortLabel.Location = new Point(604, 20);
+            serialPortLabel.Location = new Point(604, 17);
             serialPortLabel.Name = "serialPortLabel";
             serialPortLabel.Size = new Size(44, 17);
             serialPortLabel.TabIndex = 6;
@@ -109,7 +111,7 @@
             // kbLabel
             // 
             kbLabel.AutoSize = true;
-            kbLabel.Location = new Point(789, 15);
+            kbLabel.Location = new Point(668, 97);
             kbLabel.Name = "kbLabel";
             kbLabel.Size = new Size(32, 17);
             kbLabel.TabIndex = 9;
@@ -118,13 +120,13 @@
             // mousePosLabel
             // 
             mousePosLabel.AutoSize = true;
-            mousePosLabel.Location = new Point(689, 15);
+            mousePosLabel.Location = new Point(668, 45);
             mousePosLabel.Name = "mousePosLabel";
             mousePosLabel.Size = new Size(32, 17);
             mousePosLabel.TabIndex = 10;
             mousePosLabel.Text = "鼠标";
             // 
-            // Form1
+            // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
@@ -137,7 +139,7 @@
             Controls.Add(comboBox1);
             Controls.Add(captureBtn);
             Controls.Add(groupBox1);
-            Name = "Form1";
+            Name = "MainForm";
             Text = "Form1";
             Load += Form1_Load;
             groupBox1.ResumeLayout(false);
