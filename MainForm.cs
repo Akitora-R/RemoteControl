@@ -1,19 +1,21 @@
+using Emgu.CV;
 using System.IO.Ports;
-using AForge.Video;
-using AForge.Video.DirectShow;
 
 namespace RemoteControl
 {
     public partial class MainForm : Form
     {
-        private VideoCaptureDevice? videoSource;
         private SerialPortHandler? serialPortHandler;
         private MouseListener? mouseListener;
         private MousePacketBuilder mousePacketBuilder = new();
         private KeyboardListener? keyboardListener;
         private KeyboardPacketBuilder keyboardPacketBuilder = new();
         FullScreenForm? fullScreenForm;
-        private DateTime lastUpdate = DateTime.MinValue;
+
+        private VideoCapture _videoCapture;
+        private bool _isCapturing = false;
+        private System.Timers.Timer _frameTimer;
+        private int _targetFPS = 60; // 目标帧率
 
         public MainForm()
         {
@@ -119,15 +121,31 @@ namespace RemoteControl
 
         private void InitializeVideoDevices()
         {
-            // 获取所有可用的视频设备
-            FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
-            if (videoDevices.Count > 0)
+            List<string> devices = new List<string>();
+            for (int i = 0; i < 10; i++) // 假设最多有 10 个设备
+            {
+                try
+                {
+                    using (var capture = new VideoCapture(i, VideoCapture.API.Any))
+                    {
+                        if (capture.IsOpened)
+                        {
+                            devices.Add($"设备 {i}");
+                        }
+                    }
+                }
+                catch
+                {
+                    // 忽略异常
+                }
+            }
+            if (devices.Count > 0)
             {
                 // 将设备名称添加到 ComboBox 中
-                foreach (FilterInfo device in videoDevices)
+                foreach (var device in devices)
                 {
-                    comboBox1.Items.Add(device.Name);
+                    comboBox1.Items.Add(device);
                 }
 
                 // 默认选择第一个设备
@@ -140,26 +158,27 @@ namespace RemoteControl
         }
 
 
-        private void VideoNewFrame(object sender, NewFrameEventArgs eventArgs)
+        private void VideoNewFrame(object sender, EventArgs eventArgs)
         {
-            // 限制刷新频率
-            if (DateTime.Now.Subtract(lastUpdate).TotalMilliseconds < 25)
+            if (_videoCapture == null || !_videoCapture.IsOpened)
             {
                 return;
             }
-            lastUpdate = DateTime.Now;
 
-            Bitmap newFrame;
-
-            try
+            if (_videoCapture != null && _videoCapture.IsOpened)
             {
-                // 克隆新帧
-                newFrame = (Bitmap)eventArgs.Frame.Clone();
-                NewFrameToPicBox(newFrame);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing new frame: {ex.Message}");
+                using Mat frame = _videoCapture.QueryFrame();
+                if (frame != null)
+                {
+                    try
+                    {
+                        NewFrameToPicBox(frame.ToBitmap());
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing new frame: {ex.Message}");
+                    }
+                }
             }
         }
 
@@ -197,13 +216,16 @@ namespace RemoteControl
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
-            if (videoSource != null && videoSource.IsRunning)
-            {
-                videoSource.SignalToStop();
-                videoSource = null;
-            }
             mouseListener?.Dispose();
             keyboardListener?.Dispose();
+            // 关闭视频设备
+            _videoCapture?.Stop();
+            _videoCapture?.Dispose();
+            _frameTimer?.Stop();
+            _frameTimer?.Dispose();
+            _frameTimer = null;
+            _videoCapture = null;
+            serialPortHandler?.ClosePort();
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -219,42 +241,37 @@ namespace RemoteControl
                 return;
             }
 
-            if (videoSource != null)
+            if (_isCapturing)
             {
-                if (videoSource.IsRunning)
-                {
-                    // 如果摄像头正在运行，停止捕获
-                    videoSource.SignalToStop();
-                    videoSource.WaitForStop();
-                    captureBtn.Text = "开始捕获";
-                }
-                else
-                {
-                    // 如果摄像头没有运行，开始捕获
-                    videoSource.Start();
-                    captureBtn.Text = "停止捕获";
-                }
+                // 如果正在捕获，停止捕获
+                _videoCapture?.Stop();
+                _videoCapture?.Dispose();
+                _frameTimer?.Stop();
+                _frameTimer?.Dispose();
+                _frameTimer = null;
+                _videoCapture = null;
+                captureBtn.Text = "开始捕获";
+                _isCapturing = false;
             }
             else
             {
-                // 获取所有可用的视频设备
-                FilterInfoCollection videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                // 如果未在捕获，开始捕获
+                int deviceIndex = comboBox1.SelectedIndex;
+                _videoCapture = new VideoCapture(deviceIndex, VideoCapture.API.Any);
 
-                if (videoDevices.Count > 0)
+                if (!_videoCapture.IsOpened)
                 {
-                    // 根据 ComboBox 中选中的设备创建 VideoCaptureDevice
-                    videoSource = new VideoCaptureDevice(videoDevices[comboBox1.SelectedIndex].MonikerString);
-                    videoSource.NewFrame += new NewFrameEventHandler(VideoNewFrame);
+                    MessageBox.Show("无法打开视频设备！");
+                    return;
+                }
 
-                    // 开始捕获
-                    videoSource.Start();
-                    captureBtn.Text = "停止捕获";
-                }
-                else
-                {
-                    MessageBox.Show("未找到摄像头设备！");
-                }
+                _frameTimer = new System.Timers.Timer(1000.0 / _targetFPS); // 设置定时器间隔
+                _frameTimer.Elapsed += VideoNewFrame;
+                _frameTimer.AutoReset = true;
+                _frameTimer.Start();
+
             }
+
         }
 
         private void ComBtnClick(object sender, EventArgs e)
