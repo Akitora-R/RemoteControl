@@ -1,5 +1,4 @@
 using Emgu.CV;
-using Emgu.CV.CvEnum;
 using System.IO.Ports;
 
 namespace RemoteControl
@@ -162,15 +161,22 @@ namespace RemoteControl
             {
                 return;
             }
-            using var frame = _videoCapture.QueryFrame();
-            if (frame == null)
+
+            if (_videoCapture != null && _videoCapture.IsOpened)
             {
-                return;
+                using Mat frame = _videoCapture.QueryFrame();
+                if (frame != null)
+                {
+                    try
+                    {
+                        NewFrameToPicBox(frame.ToBitmap());
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing new frame: {ex.Message}");
+                    }
+                }
             }
-            // 将帧转换为 Bitmap
-            var bitmap = frame.ToBitmap();
-            // 将新帧显示在 PictureBox 中
-            NewFrameToPicBox(bitmap);
         }
 
         private void NewFrameToPicBox(Bitmap bitmap)
