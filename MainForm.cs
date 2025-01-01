@@ -162,18 +162,15 @@ namespace RemoteControl
             {
                 return;
             }
-            lock (frameFetchLock)
+            using var frame = _videoCapture.QueryFrame();
+            if (frame == null)
             {
-                using var frame = _videoCapture.QueryFrame();
-                if (frame == null)
-                {
-                    return;
-                }
-                // 将帧转换为 Bitmap
-                Bitmap bitmap = frame.ToBitmap();
-                // 将新帧显示在 PictureBox 中
-                NewFrameToPicBox(bitmap);
+                return;
             }
+            // 将帧转换为 Bitmap
+            var bitmap = frame.ToBitmap();
+            // 将新帧显示在 PictureBox 中
+            NewFrameToPicBox(bitmap);
         }
 
         private void NewFrameToPicBox(Bitmap bitmap)
