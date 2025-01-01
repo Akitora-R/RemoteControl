@@ -1,4 +1,5 @@
-﻿namespace RemoteControl
+﻿
+namespace RemoteControl
 {
     internal class FullScreenForm : Form
     {
@@ -13,6 +14,7 @@
             this.TopMost = true;
             this.StartPosition = FormStartPosition.Manual;
             this.Bounds = Screen.PrimaryScreen!.Bounds;
+            this.KeyPreview = true;
 
             // 初始化PictureBox
             pictureBox = new PictureBox
@@ -35,6 +37,15 @@
             exitButton.Click += (s, e) => this.Close();
             pictureBox.Controls.Add(exitButton);
             pictureBox.MouseMove += FullScreenForm_MouseMove;
+            pictureBox.PreviewKeyDown += FullScreenForm_PreviewKeyDown;
+        }
+
+        private void FullScreenForm_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                this.Close();
+            }
         }
 
         private void FullScreenForm_MouseMove(object? sender, MouseEventArgs e)
