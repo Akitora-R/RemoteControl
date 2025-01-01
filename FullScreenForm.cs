@@ -1,10 +1,11 @@
 ﻿
+
 namespace RemoteControl
 {
     internal class FullScreenForm : Form
     {
-        private PictureBox pictureBox;
-        private Button exitButton;
+        private readonly PictureBox pictureBox;
+        private readonly Button exitButton;
 
         public FullScreenForm()
         {
@@ -15,13 +16,13 @@ namespace RemoteControl
             this.StartPosition = FormStartPosition.Manual;
             this.Bounds = Screen.PrimaryScreen!.Bounds;
             this.KeyPreview = true;
+            this.KeyDown += FullScreenForm_KeyDown;
 
             // 初始化PictureBox
             pictureBox = new PictureBox
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.Black, // 替换为需要的背景或图像
-                                         // Image = Image.FromFile("your_image_path") // 如果需要显示图片
+                BackColor = Color.Black,
             };
             this.Controls.Add(pictureBox);
 
@@ -37,10 +38,9 @@ namespace RemoteControl
             exitButton.Click += (s, e) => this.Close();
             pictureBox.Controls.Add(exitButton);
             pictureBox.MouseMove += FullScreenForm_MouseMove;
-            pictureBox.PreviewKeyDown += FullScreenForm_PreviewKeyDown;
         }
 
-        private void FullScreenForm_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+        private void FullScreenForm_KeyDown(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Escape)
             {
