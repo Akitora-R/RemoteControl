@@ -18,8 +18,7 @@ namespace RemoteControl
         public MainForm()
         {
             InitializeComponent();
-            this.Text = "USB摄像头捕获";
-            // 初始化 ComboBox 并列举所有视频设备
+            this.Text = "Remote Control";
             InitializeVideoDevices();
             InitializeSerialPorts();
         }
