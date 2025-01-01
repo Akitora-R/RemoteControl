@@ -15,9 +15,8 @@ namespace RemoteControl
 
         private VideoCapture _videoCapture;
         private bool _isCapturing = false;
-        private System.Timers.Timer _frameTimer;
+        private System.Windows.Forms.Timer _frameTimer;
         private readonly int _targetFPS = 30; // 目标帧率
-        private readonly object frameFetchLock = new();
 
         public MainForm()
         {
@@ -123,7 +122,6 @@ namespace RemoteControl
 
         private void InitializeVideoDevices()
         {
-
             List<string> devices = new List<string>();
             for (int i = 0; i < 10; i++) // 假设最多有 10 个设备
             {
@@ -165,18 +163,15 @@ namespace RemoteControl
             {
                 return;
             }
-            lock (frameFetchLock)
+            using var frame = _videoCapture.QueryFrame();
+            if (frame == null)
             {
-                using var frame = _videoCapture.QueryFrame();
-                if (frame == null)
-                {
-                    return;
-                }
-                // 将帧转换为 Bitmap
-                Bitmap bitmap = frame.ToBitmap();
-                // 将新帧显示在 PictureBox 中
-                NewFrameToPicBox(bitmap);
+                return;
             }
+            // 将帧转换为 Bitmap
+            var bitmap = frame.ToBitmap();
+            // 将新帧显示在 PictureBox 中
+            NewFrameToPicBox(bitmap);
         }
 
         private void NewFrameToPicBox(Bitmap bitmap)
@@ -230,7 +225,7 @@ namespace RemoteControl
 
         }
 
-        private void CaptureBtnClick(object sender, EventArgs e)
+        private async void CaptureBtnClick(object sender, EventArgs e)
         {
             if (comboBox1.SelectedIndex == -1)
             {
@@ -247,21 +242,19 @@ namespace RemoteControl
                 _frameTimer?.Dispose();
                 _frameTimer = null;
                 _videoCapture = null;
-                captureBtn.Text = "开始捕获";
                 _isCapturing = false;
+                captureBtn.Text = "开始捕获";
             }
             else
             {
-                // 如果未在捕获，开始捕获
+                captureBtn.Enabled = false;
                 int deviceIndex = comboBox1.SelectedIndex;
-                _videoCapture = new VideoCapture(deviceIndex, VideoCapture.API.Any);
-
+                _videoCapture = await Task.Run(() => new VideoCapture(deviceIndex, VideoCapture.API.Any));
                 if (!_videoCapture.IsOpened)
                 {
                     MessageBox.Show("无法打开视频设备！");
                     return;
                 }
-
                 // 设置捕获的分辨率
                 _videoCapture.Set(CapProp.FrameWidth, 1920);
                 _videoCapture.Set(CapProp.FrameHeight, 1080);
@@ -271,11 +264,15 @@ namespace RemoteControl
                 int height = (int)_videoCapture.Get(CapProp.FrameHeight);
                 Console.WriteLine($"设置的分辨率: {width}x{height}");
 
-                _frameTimer = new System.Timers.Timer(1000.0 / _targetFPS); // 设置定时器间隔
-                _frameTimer.Elapsed += VideoNewFrame;
-                _frameTimer.AutoReset = true;
+                _frameTimer = new System.Windows.Forms.Timer
+                {
+                    Interval = 1000 / _targetFPS
+                }; // 设置定时器间隔
+                _frameTimer.Tick += VideoNewFrame;
                 _frameTimer.Start();
-
+                _isCapturing = true;
+                captureBtn.Text = "停止捕获";
+                captureBtn.Enabled = true;
             }
 
         }
