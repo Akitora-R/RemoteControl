@@ -1,4 +1,5 @@
 using Emgu.CV;
+using Emgu.CV.CvEnum;
 using System.IO.Ports;
 
 namespace RemoteControl
@@ -15,7 +16,8 @@ namespace RemoteControl
         private VideoCapture _videoCapture;
         private bool _isCapturing = false;
         private System.Timers.Timer _frameTimer;
-        private int _targetFPS = 60; // 目标帧率
+        private readonly int _targetFPS = 30; // 目标帧率
+        private readonly object frameFetchLock = new();
 
         public MainForm()
         {
@@ -157,28 +159,23 @@ namespace RemoteControl
             }
         }
 
-
         private void VideoNewFrame(object sender, EventArgs eventArgs)
         {
             if (_videoCapture == null || !_videoCapture.IsOpened)
             {
                 return;
             }
-
-            if (_videoCapture != null && _videoCapture.IsOpened)
+            lock (frameFetchLock)
             {
-                using Mat frame = _videoCapture.QueryFrame();
-                if (frame != null)
+                using var frame = _videoCapture.QueryFrame();
+                if (frame == null)
                 {
-                    try
-                    {
-                        NewFrameToPicBox(frame.ToBitmap());
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error processing new frame: {ex.Message}");
-                    }
+                    return;
                 }
+                // 将帧转换为 Bitmap
+                Bitmap bitmap = frame.ToBitmap();
+                // 将新帧显示在 PictureBox 中
+                NewFrameToPicBox(bitmap);
             }
         }
 
@@ -264,6 +261,15 @@ namespace RemoteControl
                     MessageBox.Show("无法打开视频设备！");
                     return;
                 }
+
+                // 设置捕获的分辨率
+                _videoCapture.Set(CapProp.FrameWidth, 1920);
+                _videoCapture.Set(CapProp.FrameHeight, 1080);
+
+                // 获取实际设置的分辨率
+                int width = (int)_videoCapture.Get(CapProp.FrameWidth);
+                int height = (int)_videoCapture.Get(CapProp.FrameHeight);
+                Console.WriteLine($"设置的分辨率: {width}x{height}");
 
                 _frameTimer = new System.Timers.Timer(1000.0 / _targetFPS); // 设置定时器间隔
                 _frameTimer.Elapsed += VideoNewFrame;
