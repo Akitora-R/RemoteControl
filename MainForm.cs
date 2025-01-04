@@ -46,6 +46,10 @@ namespace RemoteControl
         {
             return new((key, pressed) =>
             {
+                if (key == Keys.Escape)
+                {
+                    return;
+                }
                 if (pressed)
                 {
                     h.SendCommand(keyboardPacketBuilder.OnKeyPress(key));
@@ -307,6 +311,7 @@ namespace RemoteControl
         }
         private void FullScreenForm_FormClosed(object? sender, FormClosedEventArgs e)
         {
+            serialPortHandler?.SendCommand(keyboardPacketBuilder.Reset());
             // 当 FullScreenForm 关闭时触发
             fullScreenForm?.Dispose();
             fullScreenForm = null;
